@@ -1,0 +1,59 @@
+hdfs dfs -mkdir Buyers
+pig -useHCatalog
+data = LOAD 'fmamagh2.pain_pills' using org.apache.hive.hcatalog.pig.HCatLoader();
+DESCRIBE data;
+Buyers = foreach data generate buyer_dea_no, buyer_bus_act, buyer_name, buyer_address1, buyer_address2, buyer_city, buyer_state, buyer_zip, buyer_county, drug_code, drug_name, quantity, transaction_date;
+describe Buyers;
+
+c = foreach Buyers generate drug_code, drug_name;
+Drugname = DISTINCT c;
+dump Drugname; 
+
+SPLIT Buyers INTO B_OXY IF drug_name == 'OXYCODONE', B_HYDRO IF drug_name == 'HYDROCODONE' ;
+
+-- The reason for making different queries is to work on as small tables as possible
+-- shortening the buyers' names
+boN = foreach B_OXY generate buyer_dea_no, SUBSTRING(buyer_name, 0, 11) AS buyer_name, drug_name;
+boName = DISTINCT boN;
+
+-- Extracting the top 100 Buyers
+bo1 = foreach B_OXY generate buyer_dea_no, drug_name, quantity;
+bo2 = group bo1 by buyer_dea_no;
+describe bo2;
+
+bo_total = foreach bo2 generate group, SUM(bo1.quantity) As total;
+bo_sort = ORDER bo_total BY total desc;
+bo100 = limit bo_sort 100;
+-- The reason for this join is to add shortened buyer_name column
+oxy_total1 = JOIN bo100 BY group, boName BY buyer_dea_no;
+oxy_total2 = foreach oxy_total1 generate boName::buyer_dea_no AS buyer_dea_no , boName::buyer_name AS buyer_name , boName::drug_name AS drug_name , bo100::total AS total;
+oxy_total100 = ORDER oxy_total2 BY total DESC;
+STORE oxy_total100 INTO 'Buyers/oxytotal';
+
+-- List of top 2 purchases per each buyer in top 100
+Buyer_oxy1 = group B_OXY BY buyer_dea_no;
+Buyer_oxy2 = foreach Buyer_oxy1{
+	sorted = ORDER B_OXY BY quantity DESC;
+	high_qty = limit sorted 2;
+	generate group, FLATTEN(high_qty);};   
+Buyer_oxy3 = JOIN oxy_total100 BY buyer_dea_no , Buyer_oxy2 BY group;
+
+Buyers_Detail1 = foreach Buyer_oxy3 generate oxy_total100::buyer_dea_no AS buyer_dea_no, Buyer_oxy2::high_qty::buyer_bus_act AS buyer_bus_act, oxy_total100::buyer_name AS buyer_name, Buyer_oxy2::high_qty::buyer_name AS buyer_name_dtl, Buyer_oxy2::high_qty::buyer_address1 AS buyer_address1,Buyer_oxy2::high_qty::buyer_address2 As buyer_address2, Buyer_oxy2::high_qty::buyer_city AS buyer_city,Buyer_oxy2::high_qty::buyer_state AS buyer_state,Buyer_oxy2::high_qty::buyer_zip As buyer_zip ,Buyer_oxy2::high_qty::buyer_county AS buyer_county, Buyer_oxy2::high_qty::drug_name AS drug_name ,Buyer_oxy2::high_qty::quantity AS quantity, Buyer_oxy2::high_qty::transaction_date AS Date;   
+Describe Buyers_Detail1
+
+-- Preparing the date format for 3D map in excel 
+Buyers_Detail = foreach Buyers_Detail1 generate buyer_dea_no, buyer_bus_act, buyer_name, buyer_name_dtl, buyer_address1, buyer_address2, buyer_city, buyer_state, buyer_zip, buyer_county, drug_name, quantity, CONCAT(SUBSTRING(Date,0,2),'/',SUBSTRING(Date,2,4),'/',SUBSTRING(Date,4,9)) AS Date;  
+describe Buyers_Detail; 
+STORE Buyers_Detail INTO 'Buyers/oxydetail';
+
+
+hdfs dfs -mv Buyers/oxydetail/part-r-00000 Buyers/oxydetail/oxydetail
+hdfs dfs -mv Buyers/oxytotal/part-r-00000 Buyers/oxytotal/oxytotal
+
+
+hdfs dfs -get Buyers/oxytotal/oxytotal
+hdfs dfs -get Buyers/oxydetail/oxydetail
+
+scp fmamagh2@129.150.69.91:/home/fmamagh2/oxytotal oxytotal.tsv
+scp fmamagh2@129.150.69.91:/home/fmamagh2/oxydetail oxydetail.tsv
+
