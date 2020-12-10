@@ -1,0 +1,54 @@
+hdfs dfs -chmod -R o+w tmp/
+hdfs dfs -chmod -R o+w Group5/
+beeline
+!connect jdbc:hive2://summer2020-bdcsce-1:2181,summer2020-bdcsce-2:2181,summer2020-bdcsce-3:2181/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2?tez.queue.name=interactive  bdcsce_admin
+use fmamagh2;
+CREATE  TABLE if not exists pain_pills (
+REPORTER_DEA_NO  STRING , 
+REPORTER_BUS_ACT STRING , 
+REPORTER_NAME STRING , 
+REPORTER_ADDL_CO_INFO STRING , 
+REPORTER_ADDRESS1 STRING , 
+REPORTER_ADDRESS2 STRING , 
+REPORTER_CITY STRING , 
+REPORTER_STATE STRING , 
+REPORTER_ZIP STRING , 
+REPORTER_COUNTY STRING , 
+BUYER_DEA_NO STRING , 
+BUYER_BUS_ACT STRING , 
+BUYER_NAME STRING , 
+BUYER_ADDL_CO_INFO STRING , 
+BUYER_ADDRESS1 STRING , 
+BUYER_ADDRESS2 STRING , 
+BUYER_CITY STRING , 
+BUYER_STATE STRING , 
+BUYER_ZIP STRING , 
+BUYER_COUNTY STRING , 
+TRANSACTION_CODE STRING , 
+DRUG_CODE INT , 
+NDC_NO BIGINT , 
+DRUG_NAME STRING , 
+QUANTITY INT , 
+UNIT INT , 
+ACTION_INDICATOR INT , 
+ORDER_FORM_NO INT , 
+CORRECTION_NO INT , 
+STRENGTH INT , 
+TRANSACTION_DATE STRING , 
+CALC_BASE_WT_IN_GM FLOAT , 
+DOSAGE_UNIT INT , 
+TRANSACTION_ID INT , 
+Product_Name STRING , 
+Ingredient_Name STRING , 
+Measure STRING , 
+MME_Conversion_Factor INT , 
+Combined_Labeler_Name STRING , 
+Revised_Company_Name STRING , 
+Reporter_family STRING , 
+dos_str INT)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE
+LOCATION "/user/fmamagh2/Group5"
+TBLPROPERTIES ('skip.header.line.count'='1');
+
