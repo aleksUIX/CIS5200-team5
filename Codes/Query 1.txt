@@ -3,6 +3,7 @@ ssh jliu2@129.150.69.91
 hdfs dfs -mkdir Painpill
 hdfs dfs -mkdir /user/jliu2/Painpill/top15ms
 hdfs dfs -mkdir /user/jliu2/Painpill/productms
+hdfs dfs -mkdir /user/jliu2/Painpill/top10date
 hdfs dfs -mkdir tmp
 
 #-----------------------
@@ -100,19 +101,48 @@ select * from top15
 union all
 select "all other" as product_name, sum(quantity) as quantity
 from ms_product
-where product_name not in (select product_name from top15)
+where product_name not in (select product_name from top15);
 
 describe top15msp;
 select * from top15msp;
 #--------------------------------------------------------------------
+create table if not exists omspwd
+row format delimited fields terminated by '\t'
+stored as textfile location '/user/jliu2/Painpill/productms'
+as
+select product_name, reverse(substr(reverse(transaction_date),0,4)) as tdate, quantity
+from painpilldata;
+
+#--------------------------------------------------------------------
+create table if not exists mspwd
+row format delimited fields terminated by '\t'
+stored as textfile location '/user/jliu2/Painpill/productms'
+as
+select product_name, tdate, sum(quantity) as quantity, 
+from omspwd group by product_name, tdate order by tdate desc, quantity desc;
+#--------------------------------------------------------------------
+create table if not exists top10ms_by_year
+row format delimited fields terminated by '\t'
+stored as textfile location '/user/jliu2/Painpill/top10date'
+as
+select product_name, tdate, quantity
+from(
+select product_name, tdate, quantity, row_number() over (partition by tdate order by quantity desc) as row_num
+from mspwd ) t
+where row_num < 11;
+#---------------------------------------------------------------
 
 hdfs dfs -ls ./Painpill/top15ms
+hdfs dfs -ls ./Painpill/top10date
+
 hdfs dfs -mv ./Painpill/top15ms/1/000000_0 ./Painpill/top15ms/1/000000_1
 hdfs dfs -mv ./Painpill/top15ms/1/000000_1 ./Painpill/top15ms/000000_1
 hdfs dfs -mv ./Painpill/top15ms/2/000000_0 ./Painpill/top15ms/000000_2
 
 hdfs dfs -cat /user/jliu2/Painpill/top15ms/000000_* | hdfs dfs -put - /user/jliu2/Painpill/top15productmarketshare
-
 hdfs dfs -get /user/jliu2/Painpill/top15productmarketshare
 
+hdfs dfs -get /user/jliu2/Painpill/top10date/000000_0
+
 scp jliu2@129.150.69.91:/home/jliu2/top15productmarketshare top15productmarketshare.csv
+scp jliu2@129.150.69.91:/home/jliu2/000000_0 top10productmsbyyear.csv
